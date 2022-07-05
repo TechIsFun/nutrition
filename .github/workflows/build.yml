@@ -57,6 +57,7 @@ jobs:
       - name: Build apk 
         run: |
           cd example
+          cp android/app/google-services.json.mock android/app/google-services.json
           flutter build apk
 
       - name: Run iOS build
