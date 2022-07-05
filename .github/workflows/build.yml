@@ -57,7 +57,7 @@ jobs:
       - name: Build apk 
         run: |
           cd example
-          flutter build apk
+          flutter build apk --ignore-deprecation
 
       - name: Run iOS build
         run: |
