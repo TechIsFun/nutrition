@@ -43,6 +43,12 @@ class NutritionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
   // Only set activity for v2 embedder. Always access activity from getActivity() method.
   private var activity: Activity? = null
 
+    private val fitnessOptions: FitnessOptions by lazy {
+        FitnessOptions.builder()
+            .addDataType(DATA_TYPE, FitnessOptions.ACCESS_READ)
+            .build()
+    }
+
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPluginBinding) {
     initInstance(flutterPluginBinding.binaryMessenger, flutterPluginBinding.applicationContext)
   }
@@ -94,127 +100,175 @@ class NutritionPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
     return false
   }
 
-  private val fitnessOptions = FitnessOptions.builder()
+  /*private val fitnessOptions = FitnessOptions.builder()
       .addDataType(DATA_TYPE, FitnessOptions.ACCESS_READ)
       .addDataType(DATA_TYPE, FitnessOptions.ACCESS_WRITE)
-      .build()
+      .build()*/
 
   private fun getData(call: MethodCall, result: Result) {
-    var dataPoints: DataSet?
-    var nutritionData: List<HashMap<String, String>>
-    val googleSignInAccount: GoogleSignInAccount? = GoogleSignIn.getLastSignedInAccount(getActivity()?.applicationContext)
-    if (googleSignInAccount === null) {
-      result.error(COVAL_NUTRITION + "_NOT_LOGGED_IN_ERROR", "You don't seem to be logged in via Google.", "googleSignInAccount is null.")
-    }
+    activity?.let { activity ->
 
-    thread {
-      val startTime = call.argument<Long>("startDate")!!
-      val endTime = call.argument<Long>("endDate")!!
-      val response = Fitness.getHistoryClient(getActivity()?.applicationContext!!, googleSignInAccount!!)
-          .readData(DataReadRequest.Builder()
-              .read(DATA_TYPE)
-              .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
-              .enableServerQueries()
-              .build())
+        Log.d(COVAL_NUTRITION, "getData")
 
-      dataPoints = Tasks.await(response).getDataSet(DATA_TYPE)
-      if (dataPoints !== null && !dataPoints!!.isEmpty) {
-        nutritionData = dataPoints!!.dataPoints.mapIndexed { _, dataPoint ->
-          val nutrients = dataPoint.getValue(Field.FIELD_NUTRIENTS)
-          return@mapIndexed hashMapOf(
-              FIELD_TIMESTAMP to dataPoint.getEndTime(TimeUnit.MILLISECONDS).toString(),
-              getFieldToReturn(Field.NUTRIENT_TOTAL_FAT) to (nutrients?.getKeyValue(Field.NUTRIENT_TOTAL_FAT)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_CALCIUM) to (nutrients?.getKeyValue(Field.NUTRIENT_CALCIUM)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_SUGAR) to (nutrients?.getKeyValue(Field.NUTRIENT_SUGAR)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_DIETARY_FIBER) to (nutrients?.getKeyValue(Field.NUTRIENT_DIETARY_FIBER)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_IRON) to (nutrients?.getKeyValue(Field.NUTRIENT_IRON)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_POTASSIUM) to (nutrients?.getKeyValue(Field.NUTRIENT_POTASSIUM)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_SODIUM) to (nutrients?.getKeyValue(Field.NUTRIENT_SODIUM)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_VITAMIN_A) to (nutrients?.getKeyValue(Field.NUTRIENT_VITAMIN_A)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_VITAMIN_C) to (nutrients?.getKeyValue(Field.NUTRIENT_VITAMIN_C)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_PROTEIN) to (nutrients?.getKeyValue(Field.NUTRIENT_PROTEIN)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_CHOLESTEROL) to (nutrients?.getKeyValue(Field.NUTRIENT_CHOLESTEROL)?.toString() ?: "0"),
-              getFieldToReturn(Field.NUTRIENT_TOTAL_CARBS) to (nutrients?.getKeyValue(Field.NUTRIENT_TOTAL_CARBS)?.toString() ?: "0")
-          )
+        var dataPoints: DataSet?
+        var nutritionData: List<HashMap<String, String>>
+        /*val googleSignInAccount: GoogleSignInAccount? = GoogleSignIn.getLastSignedInAccount(activity.applicationContext)
+        if (googleSignInAccount === null) {
+            result.error(COVAL_NUTRITION + "_NOT_LOGGED_IN_ERROR",
+                "You don't seem to be logged in via Google.",
+                "googleSignInAccount is null.")
+        }*/
+
+        thread {
+            val startTime = call.argument<Long>("startDate")!!
+            val endTime = call.argument<Long>("endDate")!!
+            Log.d(COVAL_NUTRITION, "startTime=$startTime")
+            Log.d(COVAL_NUTRITION, "endTime=$endTime")
+            val response = Fitness.getHistoryClient(activity, getGoogleAccount(activity))
+                .readData(DataReadRequest.Builder()
+                    .read(DATA_TYPE)
+                    .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
+                    .enableServerQueries()
+                    .build())
+
+            dataPoints = Tasks.await(response).getDataSet(DATA_TYPE)
+
+            Log.d(COVAL_NUTRITION, "getData, dataPoints=$dataPoints")
+            if (dataPoints !== null && !dataPoints!!.isEmpty) {
+                nutritionData = dataPoints!!.dataPoints.mapIndexed { _, dataPoint ->
+                    val nutrients = dataPoint.getValue(Field.FIELD_NUTRIENTS)
+                    return@mapIndexed hashMapOf(
+                        FIELD_TIMESTAMP to dataPoint.getEndTime(TimeUnit.MILLISECONDS).toString(),
+                        getFieldToReturn(Field.NUTRIENT_TOTAL_FAT) to (nutrients?.getKeyValue(Field.NUTRIENT_TOTAL_FAT)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_CALCIUM) to (nutrients?.getKeyValue(Field.NUTRIENT_CALCIUM)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_SUGAR) to (nutrients?.getKeyValue(Field.NUTRIENT_SUGAR)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_DIETARY_FIBER) to (nutrients?.getKeyValue(Field.NUTRIENT_DIETARY_FIBER)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_IRON) to (nutrients?.getKeyValue(Field.NUTRIENT_IRON)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_POTASSIUM) to (nutrients?.getKeyValue(Field.NUTRIENT_POTASSIUM)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_SODIUM) to (nutrients?.getKeyValue(Field.NUTRIENT_SODIUM)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_VITAMIN_A) to (nutrients?.getKeyValue(Field.NUTRIENT_VITAMIN_A)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_VITAMIN_C) to (nutrients?.getKeyValue(Field.NUTRIENT_VITAMIN_C)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_PROTEIN) to (nutrients?.getKeyValue(Field.NUTRIENT_PROTEIN)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_CHOLESTEROL) to (nutrients?.getKeyValue(Field.NUTRIENT_CHOLESTEROL)
+                            ?.toString() ?: "0"),
+                        getFieldToReturn(Field.NUTRIENT_TOTAL_CARBS) to (nutrients?.getKeyValue(Field.NUTRIENT_TOTAL_CARBS)
+                            ?.toString() ?: "0")
+                    )
+                }
+
+                activity.runOnUiThread {
+                    Log.d(COVAL_NUTRITION, "Nutrition Data: $nutritionData")
+                    result.success(nutritionData)
+                }
+            } else {
+                nutritionData = listOf(hashMapOf(
+                    getFieldToReturn(Field.NUTRIENT_TOTAL_FAT) to "0",
+                    getFieldToReturn(Field.NUTRIENT_CALCIUM) to "0",
+                    getFieldToReturn(Field.NUTRIENT_SUGAR) to "0",
+                    getFieldToReturn(Field.NUTRIENT_DIETARY_FIBER) to "0",
+                    getFieldToReturn(Field.NUTRIENT_IRON) to "0",
+                    getFieldToReturn(Field.NUTRIENT_POTASSIUM) to "0",
+                    getFieldToReturn(Field.NUTRIENT_SODIUM) to "0",
+                    getFieldToReturn(Field.NUTRIENT_VITAMIN_A) to "0",
+                    getFieldToReturn(Field.NUTRIENT_VITAMIN_C) to "0",
+                    getFieldToReturn(Field.NUTRIENT_PROTEIN) to "0",
+                    getFieldToReturn(Field.NUTRIENT_CHOLESTEROL) to "0",
+                    getFieldToReturn(Field.NUTRIENT_TOTAL_CARBS) to "0"
+                ))
+
+                activity.runOnUiThread {
+                    Log.d(COVAL_NUTRITION, "Fallback to empty Nutrition Data: $nutritionData")
+                    result.success(nutritionData)
+                }
+
+            }
         }
-
-        getActivity()!!.runOnUiThread { result.success(nutritionData) }
-      } else {
-        nutritionData = listOf(hashMapOf(
-            getFieldToReturn(Field.NUTRIENT_TOTAL_FAT) to "0",
-            getFieldToReturn(Field.NUTRIENT_CALCIUM) to "0",
-            getFieldToReturn(Field.NUTRIENT_SUGAR) to "0",
-            getFieldToReturn(Field.NUTRIENT_DIETARY_FIBER) to "0",
-            getFieldToReturn(Field.NUTRIENT_IRON) to "0",
-            getFieldToReturn(Field.NUTRIENT_POTASSIUM) to "0",
-            getFieldToReturn(Field.NUTRIENT_SODIUM) to "0",
-            getFieldToReturn(Field.NUTRIENT_VITAMIN_A) to "0",
-            getFieldToReturn(Field.NUTRIENT_VITAMIN_C) to "0",
-            getFieldToReturn(Field.NUTRIENT_PROTEIN) to "0",
-            getFieldToReturn(Field.NUTRIENT_CHOLESTEROL) to "0",
-            getFieldToReturn(Field.NUTRIENT_TOTAL_CARBS) to "0"
-        ))
-
-        getActivity()!!.runOnUiThread { result.success(nutritionData) }
-
-      }
     }
   }
 
   private fun addData(call: MethodCall, result: Result) {
-    val nutritionData: HashMap<String, Float> = call.argument<HashMap<String, Float>>("nutrients")!!
-    val googleSignInAccount: GoogleSignInAccount? = GoogleSignIn.getLastSignedInAccount(getActivity()?.applicationContext)
-    if (googleSignInAccount === null) {
-      result.error(COVAL_NUTRITION + "_NOT_LOGGED_IN_ERROR", "You don't seem to be logged in via Google.", "googleSignInAccount is null.")
-    }
+      activity?.let { activity ->
+          val nutritionData: HashMap<String, Float> = call.argument<HashMap<String, Float>>("nutrients")!!
+          val googleSignInAccount: GoogleSignInAccount? =
+              GoogleSignIn.getLastSignedInAccount(activity.applicationContext)
+          if (googleSignInAccount === null) {
+              result.error(COVAL_NUTRITION + "_NOT_LOGGED_IN_ERROR",
+                  "You don't seem to be logged in via Google.",
+                  "googleSignInAccount is null.")
+          }
 
-    val nutritionSource: DataSource = DataSource.Builder()
-        .setAppPackageName(getActivity()?.applicationContext!!.packageName)
-        .setDataType(DataType.TYPE_NUTRITION)
-        .setType(DataSource.TYPE_RAW)
-        .build()
+          val nutritionSource: DataSource = DataSource.Builder()
+              .setAppPackageName(activity.applicationContext.packageName)
+              .setDataType(DataType.TYPE_NUTRITION)
+              .setType(DataSource.TYPE_RAW)
+              .build()
 
-    val nutrients: HashMap<String, Float> = HashMap()
-    nutritionData.forEach { (key, value) -> nutrients[getFieldToReturnReverse(key)] = value }
+          val nutrients: HashMap<String, Float> = HashMap()
+          nutritionData.forEach { (key, value) -> nutrients[getFieldToReturnReverse(key)] = value }
 
-    thread {
-      val startTime = call.argument<Long>("date")!!
-      val dataPoint: DataPoint = DataPoint.builder(nutritionSource)
-          .setTimestamp(startTime, TimeUnit.MILLISECONDS)
-          .setField(Field.FIELD_MEAL_TYPE, Field.MEAL_TYPE_UNKNOWN)
-          .setField(Field.FIELD_NUTRIENTS, nutrients)
-          .build()
+          thread {
+              val startTime = call.argument<Long>("date")!!
+              val dataPoint: DataPoint = DataPoint.builder(nutritionSource)
+                  .setTimestamp(startTime, TimeUnit.MILLISECONDS)
+                  .setField(Field.FIELD_MEAL_TYPE, Field.MEAL_TYPE_UNKNOWN)
+                  .setField(Field.FIELD_NUTRIENTS, nutrients)
+                  .build()
 
-      val dataSet = DataSet.create(nutritionSource)
-      dataSet.add(dataPoint)
-      val dataSetResult = Fitness.getHistoryClient(getActivity()?.applicationContext!!, googleSignInAccount!!)
-          .insertData(dataSet)
+              val dataSet = DataSet.create(nutritionSource)
+              dataSet.add(dataPoint)
+              val dataSetResult = Fitness.getHistoryClient(getActivity()?.applicationContext!!, googleSignInAccount!!)
+                  .insertData(dataSet)
 
-      getActivity()!!.runOnUiThread { result.success(dataSetResult.isSuccessful) }
-    }
+              activity.runOnUiThread { result.success(dataSetResult.isSuccessful) }
+          }
+      }
   }
 
   private fun requestPermission(call: MethodCall, result: Result) {
-    latestResult = result
-    val googleSignInAccount: GoogleSignInAccount? = GoogleSignIn.getLastSignedInAccount(getActivity()!!)
-    if (googleSignInAccount === null) {
-      Log.e(COVAL_NUTRITION, "Unable to retrieve the last signed in account.")
-      latestResult?.error(COVAL_NUTRITION + "_NOT_LOGGED_IN_ERROR", "Cannot retrieve the last signed in account.", "googleSignInAccount is null.")
-    }
+      activity?.let { activity ->
+          latestResult = result
+          /*val googleSignInAccount: GoogleSignInAccount? = GoogleSignIn.getLastSignedInAccount(getActivity()!!)
+          if (googleSignInAccount === null) {
+              Log.e(COVAL_NUTRITION, "Unable to retrieve the last signed in account.")
+              latestResult?.error(COVAL_NUTRITION + "_NOT_LOGGED_IN_ERROR",
+                  "Cannot retrieve the last signed in account.",
+                  "googleSignInAccount is null.")
+          }*/
 
-    if (!GoogleSignIn.hasPermissions(googleSignInAccount, fitnessOptions)) {
-      GoogleSignIn.requestPermissions(
-          getActivity()!!,
-          GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
-          GoogleSignIn.getLastSignedInAccount(getActivity()?.applicationContext),
-          fitnessOptions)
-    } else {
-      latestResult?.success(true)
-      Log.d(COVAL_NUTRITION, "Permission was already granted.")
-    }
+          if (!GoogleSignIn.hasPermissions(getGoogleAccount(activity), fitnessOptions)) {
+              GoogleSignIn.requestPermissions(
+                  activity,
+                  GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
+                  GoogleSignIn.getAccountForExtension(activity.applicationContext, fitnessOptions),
+                  fitnessOptions)
+          } else {
+              latestResult?.success(true)
+              Log.d(COVAL_NUTRITION, "Permission was already granted.")
+          }
+      }
   }
 
-  override fun onMethodCall(call: MethodCall, result: Result) {
+    private fun oAuthPermissionsApproved(context: Context) = GoogleSignIn.hasPermissions(getGoogleAccount(context), fitnessOptions)
+
+    /**
+     * Gets a Google account for use in creating the Fitness client. This is achieved by either
+     * using the last signed-in account, or if necessary, prompting the user to sign in.
+     * `getAccountForExtension` is recommended over `getLastSignedInAccount` as the latter can
+     * return `null` if there has been no sign in before.
+     */
+    private fun getGoogleAccount(context: Context) = GoogleSignIn.getAccountForExtension(context, fitnessOptions)
+
+    override fun onMethodCall(call: MethodCall, result: Result) {
     latestCall = call
     latestResult = result
     when (call.method) {
